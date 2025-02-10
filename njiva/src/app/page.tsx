@@ -8,7 +8,7 @@ import Button from '@/components/ui/Button'
 import { validateEmail, validateName } from '@/lib/utils/validation'
 import AccessCodeOverlay from '@/components/auth/AccessCodeOverlay'
 import SignInOverlay from '@/components/auth/SignInOverlay'
-
+console.log(`[LANDINGPAGE.TSX] Mounted**********************`);
 export default function LandingPage() {
   const [firstName, setFirstName] = useState('')
   const [email, setEmail] = useState('')

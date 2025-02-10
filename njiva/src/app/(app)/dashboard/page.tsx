@@ -1,4 +1,5 @@
 'use client';
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronDown, ArrowRight } from 'lucide-react';
@@ -7,155 +8,247 @@ import Sidebar from '@/components/dashboard/Sidebar';
 import TextArea from '@/components/ui/TextArea';
 import EntryList from '@/components/dashboard/EntryList';
 import Button from '@/components/ui/Button';
+import { getUserLocalDateTime } from '@/lib/utils/dateTimeUtils';
+import { SectionType } from '@/components/dashboard/Sidebar';
+
+import DoView from '@/components/views/DoView';
+import PlanView from '@/components/views/PlanView';
+import ThinkView from '@/components/views/ThinkView';
+import DatesView from '@/components/views/DatesView';
+import ShopView from '@/components/views/ShopView';
 
 interface Entry {
   id: string;
+  user_id: string;
   content: string;
   created_at: string;
   updated_at: string;
 }
 
 export default function DashboardPage() {
-  const [entries, setEntries] = useState<Entry[]>([]); // Define Entry type
+  console.log('[DashboardPage] Component is rendering...');
+
+  const [entries, setEntries] = useState<Entry[]>([]);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [activeSection, setActiveSection] = useState('do');
+  const [showOrganizeButton, setShowOrganizeButton] = useState(false);
+  const [activeSection, setActiveSection] = useState<SectionType>('do');
   const [inputText, setInputText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [firstName, setFirstName] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [firstName, setFirstName] = useState<string | null>(null);
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [currentView, setCurrentView] = useState<SectionType>('main');
   const router = useRouter();
+
+  useEffect(() => {
+    console.log('[DashboardPage] Validating session...');
+    validateSession();
+  }, []);
+
+  const validateSession = async () => {
+    try {
+      const response = await fetch('/api/auth/get-session-token', {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        router.push('/');
+        return;
+      }
+
+      const { token } = await response.json();
+      setSessionToken(token);
+
+      const validationResponse = await fetch('/api/auth/validate-session', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (validationResponse.ok) {
+        const data = await validationResponse.json();
+        setFirstName(data.firstName);
+        fetchEntries();
+      } else {
+        router.push('/');
+      }
+    } catch (error) {
+      console.error('[DashboardPage] Error validating session:', error);
+      router.push('/');
+    }
+  };
 
   const fetchEntries = async () => {
     try {
       const response = await fetch('/api/entries/pending', {
         method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-      })
-  
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${sessionToken}`,
+        },
+        credentials: 'include',
+      });
+
       if (response.ok) {
-        const data = await response.json()
-        console.log('[DashboardPage] Fetched entries:', data) // Log API response
-        setEntries(data)
-      } else {
-        console.warn('[DashboardPage] Failed to fetch entries')
+        const data = await response.json();
+        console.log(`Entries count: ${data.length}, Show Organize: ${data.length >= 3}`);
+        setEntries(data);
+        setShowOrganizeButton(data.length >= 3);
       }
     } catch (error) {
-      console.error('[DashboardPage] Error fetching entries:', error)
+      console.error('[DashboardPage] Error fetching entries:', error);
     }
-  }
-
-  useEffect(() => {
-    const fetchUserData = async () => {
-      const sessionToken = document.cookie
-        .split('; ')
-        .find((row) => row.startsWith('njiva-session='))
-        ?.split('=')[1];
-
-      if (!sessionToken) {
-        router.push('/');
-        return;
-      }
-
-      try {
-        const response = await fetch('/api/auth/validate-session', {
-          headers: { Authorization: `Bearer ${sessionToken}` },
-        });
-
-        if (!response.ok) {
-          router.push('/');
-          return;
-        }
-
-        const { firstName } = await response.json();
-        setFirstName(firstName);
-        await fetchEntries();
-      } catch (error) {
-        router.push('/');
-      }
-    };
-
-    fetchUserData();
-  }, [router]);
+  };
 
   const handleSubmit = async () => {
-    if (!inputText.trim()) {
-      console.warn('[DashboardPage] Attempted to submit empty input')
-      return;
-    }
-    console.log('[DashboardPage] Submitting input:', inputText) // Log the input
+    if (!inputText.trim()) return;
+
     setIsSubmitting(true);
     try {
       const response = await fetch('/api/entries/pending', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: inputText }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${sessionToken}`,
+        },
+        credentials: 'include',
+        body: JSON.stringify({ content: inputText.trim() }),
       });
 
       if (response.ok) {
         setInputText('');
-        await fetchEntries();
+        fetchEntries();
       }
     } catch (error) {
-      console.error('[DashboardPage] Error submitting input:', error);
+      console.error('[DashboardPage] Error submitting entry:', error);
+    } finally {
+      setIsSubmitting(false);
     }
-    setIsSubmitting(false);
   };
 
-  const handleLogout = () => {
-    document.cookie = 'njiva-session=; Max-Age=0; path=/;';
-    router.push('/');
-  };
 
   const handleDelete = async (id: string) => {
+    console.log(`[DashboardPage] Attempting to delete entry: ${id}`);
     try {
       const response = await fetch('/api/entries/pending', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${sessionToken}`,
+        },
+        credentials: 'include',
         body: JSON.stringify({ id }),
       });
 
+
       if (response.ok) {
-        await fetchEntries();
+        console.log(`[DashboardPage] Entry deleted successfully: ${id}`);
+        fetchEntries();
+      } else {
+        console.warn(`[DashboardPage] Failed to delete entry: ${id}`);
       }
     } catch (error) {
-      console.error('[DashboardPage] Error deleting entry:', error);
+      console.error(`[DashboardPage] Error deleting entry: ${id}`, error);
     }
   };
 
+
   const handleEdit = async (id: string, updatedContent: string) => {
+    console.log(`[DashboardPage] Attempting to edit entry: ${id}`);
     try {
       const response = await fetch('/api/entries/pending', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${sessionToken}`,
+        },
+        credentials: 'include',
         body: JSON.stringify({ id, content: updatedContent }),
       });
 
+        
+
+
       if (response.ok) {
-        await fetchEntries();
+        console.log(`[DashboardPage] Entry updated successfully: ${id}`);
+        fetchEntries();
+      } else {
+        console.warn(`[DashboardPage] Failed to update entry: ${id}`);
       }
     } catch (error) {
-      console.error('[DashboardPage] Error editing entry:', error);
+      console.error(`[DashboardPage] Error editing entry: ${id}`, error);
     }
   };
+  
+  const handleOrganize = async () => {
+    setIsProcessing(true);
+    try {
+      const response = await fetch('/api/entries/process', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${sessionToken}`,
+        },
+        credentials: 'include',
+        body: JSON.stringify({ 
+          userLocalDate: new Date().toISOString() 
+        })
+      });
+  
+      if (response.ok) {
+        fetchEntries();
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+  
+  const handleLogout = async () => {
+    console.log('[DashboardPage] Logging out user...');
+    try {
+          await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+          document.cookie = "njiva-session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+          router.push('/');
+        } catch (error) {
+        console.error('[DashboardPage] Logout failed:', error);
+        }
+  };    
+
+
+  if (!sessionToken || firstName === null) {
+    return <div className="flex justify-center items-center h-screen text-gray-400">Loading...</div>;
+  }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-foreground/10">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Logo size="md" />
-          <div className="relative">
+    <div className="min-h-screen bg-gray-900 text-gray-100 cursor-default select-none">
+      <header className="border-b border-gray-800 bg-gray-900 select-none">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <Logo size="md" className="cursor-default pointer-events-none" />
+          <div className="relative flex items-center gap-4">
+          {showOrganizeButton && (
+              <Button 
+                onClick={handleOrganize} 
+                disabled={isProcessing} 
+                className="px-4 py-1.5 text-sm font-medium rounded-full bg-blue-500 hover:bg-blue-600 text-white"
+              >
+                {isProcessing ? "Processing..." : "Organize"}
+              </Button>
+            )}
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full text-white bg-foreground/10 hover:bg-foreground/20 transition-colors"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-800 hover:bg-gray-700"
             >
-              <span className="font-medium">{firstName}</span>
+              <span className="cursor-default">{firstName}</span>
               <ChevronDown className="h-4 w-4" />
             </button>
             {showUserMenu && (
-              <div className="absolute right-0 mt-2 w-48 py-2 bg-background border border-foreground/10 rounded-lg shadow-lg">
-                <button
-                  onClick={handleLogout}
-                  className="w-full px-4 py-2 text-left text-foreground/70 hover:text-foreground hover:bg-foreground/5"
-                >
+              <div className="absolute right-0 top-10 w-48 py-2 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50">
+                <button onClick={handleLogout} className="w-full px-4 py-2 text-left hover:bg-gray-700 text-red-500">
                   Log out
                 </button>
               </div>
@@ -163,46 +256,57 @@ export default function DashboardPage() {
           </div>
         </div>
       </header>
-      <div className="flex h-[calc(100vh-4rem-4rem)] md:h-[calc(100vh-4rem)]">
-        <Sidebar
-          activeSection={activeSection}
-          onSectionChange={(section) => setActiveSection(section)}
-        />
-        <main className="flex-1 flex flex-col pb-16 md:pb-0">
-          <div className="flex-1 overflow-auto px-4">
-            <EntryList
-              entries={entries}
-              onDelete={handleDelete}
-              onEdit={handleEdit}
-            />
-          </div>
-          <div className="p-4 border-t">
-            <div className="max-w-3xl mx-auto relative">
-              <TextArea
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                placeholder="Type your thoughts..."
-                autoResize
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSubmit();
-                  }
-                }}
-              />
-              {inputText.trim() && (
-                <Button
-                  className="absolute right-2 top-1/2 -translate-y-1/2"
-                  onClick={handleSubmit}
-                  disabled={isSubmitting}
-                >
-                  <ArrowRight className="h-5 w-5" />
-                </Button>
-              )}
-            </div>
-          </div>
+      <div className="flex h-[calc(100vh-4rem)]">
+        <Sidebar activeSection={activeSection} onSectionChange={(section) => {
+          setActiveSection(section);
+          setCurrentView(section);
+        }} />
+        <main className="flex-1 flex flex-col">
+          {currentView === 'main' ? (
+            <>
+              <div className="flex-1 overflow-auto px-4 sm:px-6 lg:px-8">
+                <EntryList entries={entries} onDelete={handleDelete} onEdit={handleEdit} />
+              </div>
+              <div className="sticky bottom-0 p-4 md:bottom-4 border-t border-gray-800 bg-gray-900 mb-16 md:mb-0">
+                <div className="max-w-3xl mx-auto relative">
+                  <TextArea
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
+                    placeholder="Type your thoughts..."
+                    autoResize
+                    className="pr-12 max-h-16"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSubmit();
+                      }
+                    }}
+                  />
+                  {inputText.trim() && (
+                    <Button
+                      className="absolute right-2 top-1/2 -translate-y-1/2"
+                      onClick={handleSubmit}
+                      disabled={isSubmitting}
+                    >
+                      <ArrowRight className="h-5 w-5" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </>
+          ) : currentView === 'do' ? (
+            <DoView onBack={() => setCurrentView('main')} />
+          ) : currentView === 'plan' ? (
+            <PlanView onBack={() => setCurrentView('main')} />
+          ) : currentView === 'think' ? (
+            <ThinkView onBack={() => setCurrentView('main')} />
+          ) : currentView === 'dates' ? (
+            <DatesView onBack={() => setCurrentView('main')} />
+          ) : currentView === 'shop' ? (
+            <ShopView onBack={() => setCurrentView('main')} />
+          ) : null}
         </main>
       </div>
     </div>
-  );
+   );
 }

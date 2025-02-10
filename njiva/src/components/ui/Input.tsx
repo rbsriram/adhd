@@ -2,8 +2,10 @@
 import { forwardRef } from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
 
+console.log(`[INPUT.TSX] Mounted**********************`);
+
 const inputVariants = cva(
-  'w-full rounded-lg transition-colors focus:outline-none focus:ring-1 focus:ring-foreground/20',
+  'w-full rounded-lg transition-colors focus:outline-none focus:ring-1 focus:ring-foreground/20 cursor-text',
   {
     variants: {
       variant: {

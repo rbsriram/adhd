@@ -1,11 +1,13 @@
 // components/ui/TextArea.tsx
 'use client'
 
+console.log(`[TEXTAREA.TSX] Mounted**********************`);
+
 import { forwardRef, useEffect, useRef } from 'react'
 import { cva } from 'class-variance-authority'
 
 const textAreaVariants = cva(
- 'w-full rounded-lg transition-colors focus:outline-none focus:ring-1 focus:ring-foreground/20',
+ 'w-full rounded-lg cursor-text max-h-24 transition-colors focus:outline-none focus:ring-1 focus:ring-foreground/20',
  {
    variants: {
      variant: {

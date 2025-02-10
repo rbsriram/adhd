@@ -1,3 +1,4 @@
+console.log(`[LOGO.TSX] Mounted**********************`);
 import cn from "classnames"; 
  
  interface LogoProps {
@@ -13,7 +14,7 @@ const Logo = ({ className, size = "md" }: LogoProps) => {
   };
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-3 cursor-default">
       <div className={cn("relative group", sizes[size], className)}>
         <svg
           viewBox="0 0 100 100"
@@ -53,7 +54,7 @@ const Logo = ({ className, size = "md" }: LogoProps) => {
           />
         </svg>
       </div>
-      <span className="text-2xl font-semibold tracking-tight text-foreground dark:text-white">
+      <span className="text-2xl font-semibold tracking-tight text-foreground dark:text-white cursor-pointer">
         njiva
       </span>
     </div>

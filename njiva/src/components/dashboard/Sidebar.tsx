@@ -2,18 +2,22 @@
 
 import { ListTodo, Layout, Brain, Calendar, ShoppingBag } from 'lucide-react'
 
+export type SectionType = 'main' | 'do' | 'plan' | 'think' | 'dates' | 'shop';
+
 interface SidebarProps {
-  activeSection: string
-  onSectionChange: (section: string) => void
- }
+  activeSection: SectionType;
+  onSectionChange: (section: SectionType) => void;
+}
  
-const SECTIONS = [
+const SECTIONS: { id: SectionType; icon: any; label: string }[] = [
   { id: 'do', icon: ListTodo, label: 'Do' },
   { id: 'plan', icon: Layout, label: 'Plans' },
   { id: 'think', icon: Brain, label: 'Ideas' },
   { id: 'dates', icon: Calendar, label: 'Dates' },
   { id: 'shop', icon: ShoppingBag, label: 'Shop' }
 ]
+
+
 
 export default function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
   return (
